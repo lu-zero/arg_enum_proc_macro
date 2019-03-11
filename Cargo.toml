@@ -1,0 +1,20 @@
+[package]
+name = "arg_enum_proc_macro"
+version = "0.1.0"
+authors = ["Luca Barbato <lu_zero@gentoo.org>"]
+description = "A procedural macro compatible with clap arg_enum"
+repository = "https://github.com/lu-zero/arg_enum_proc_macro"
+readme = "README.md"
+keywords = ["proc_macro", "arg_enum"]
+license = "MIT"
+edition = "2018"
+
+[lib]
+proc-macro = true
+test = false
+
+[dependencies]
+syn = { version = "0.15", features = ["extra-traits"] }
+quote = "0.6"
+proc-macro2 = "0.4"
+
