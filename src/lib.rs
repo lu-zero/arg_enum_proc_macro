@@ -143,7 +143,7 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
             }
         }
         impl #name {
-            fn variants() -> [&'static str; #len] {
+            pub fn variants() -> [&'static str; #len] {
                 [ #array_items ]
             }
         }
