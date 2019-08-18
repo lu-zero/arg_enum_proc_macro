@@ -17,8 +17,54 @@ extern crate proc_macro;
 
 use proc_macro2::{Literal, Punct, Span, TokenStream, TokenTree};
 use quote::{quote, quote_spanned};
-use syn::{parse_macro_input, Data, DeriveInput};
 use std::iter::FromIterator;
+use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
+use syn::{parenthesized, parse2, parse_macro_input, Data, DeriveInput, Ident, LitStr, Token};
+
+#[derive(Debug)]
+enum ArgEnumAttr {
+    Alias(Literal),
+}
+
+impl Parse for ArgEnumAttr {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        use self::ArgEnumAttr::*;
+        let name: Ident = input.parse()?;
+        let name_str = name.to_string();
+
+        if input.peek(Token![=]) {
+            input.parse::<Token![=]>()?;
+
+            match name_str.as_ref() {
+                "alias" => {
+                    let alias: LitStr = input.parse()?;
+                    Ok(Alias(Literal::string(&alias.value())))
+                }
+                _ => panic!("unexpected attribute {}", name_str),
+            }
+        } else {
+            panic!("unexpected attribute: {}", name_str)
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ArgEnumAttrs {
+    paren_token: syn::token::Paren,
+    attrs: Punctuated<ArgEnumAttr, Token![,]>,
+}
+
+impl Parse for ArgEnumAttrs {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        let content;
+
+        Ok(ArgEnumAttrs {
+            paren_token: parenthesized!(content in input),
+            attrs: content.parse_terminated(ArgEnumAttr::parse)?,
+        })
+    }
+}
 
 /// Implement [`std::fmt::Display`], [`std::str::FromStr`] and `variants()`.
 ///
@@ -69,7 +115,7 @@ use std::iter::FromIterator;
 ///     }
 /// }
 /// ```
-#[proc_macro_derive(ArgEnum)]
+#[proc_macro_derive(ArgEnum, attributes(arg_enum))]
 pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(items as DeriveInput);
 
@@ -80,12 +126,33 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
         panic!("Only enum supported");
     };
 
-    let len = variants.len();
+    let all_variants: Vec<(TokenTree, &Ident)> = variants
+        .iter()
+        .flat_map(|item| {
+            let id = &item.ident;
+            let lit: TokenTree = Literal::string(&id.to_string()).into();
+            let mut all_lits = vec![(lit, id)];
 
-    let from_str_match = variants.iter().flat_map(|item| {
-        let id = &item.ident;
-        let lit: TokenTree = Literal::string(&id.to_string()).into();
+            item.attrs
+                .iter()
+                .filter(|attr| attr.path.is_ident("arg_enum"))
+                // .flat_map(|attr| {
+                .for_each(|attr| {
+                    let attrs: ArgEnumAttrs = parse2(attr.tokens.clone()).unwrap();
 
+                    for attr in attrs.attrs {
+                        match attr {
+                            ArgEnumAttr::Alias(alias) => all_lits.push((alias.into(), id)),
+                        }
+                    }
+                });
+            all_lits.into_iter()
+        })
+        .collect();
+
+    let len = all_variants.len();
+
+    let from_str_match = all_variants.iter().flat_map(|(lit, id)| {
         let pat: TokenStream = quote! {
             #lit | _ if s.eq_ignore_ascii_case(#lit) => Ok(#name::#id),
         }
@@ -110,12 +177,10 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let display_match = TokenStream::from_iter(display_match);
 
-    let array_items = variants.iter().flat_map(|item| {
-        let tok: TokenTree = Literal::string(&item.ident.to_string()).into();
-        let comma: TokenTree = Punct::new(',', proc_macro2::Spacing::Alone).into();
-
-        vec![tok, comma].into_iter()
-    });
+    let comma: TokenTree = Punct::new(',', proc_macro2::Spacing::Alone).into();
+    let array_items = all_variants
+        .iter()
+        .flat_map(|(tok, _id)| vec![tok.clone(), comma.clone()].into_iter());
 
     let array_items = TokenStream::from_iter(array_items);
 
