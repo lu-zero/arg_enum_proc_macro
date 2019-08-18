@@ -26,7 +26,7 @@ pub enum Foo {
 
 ### Aliases
 
-It is possible to express an alias using the attribute `arg_enum(alias = "AliasVariant"`.
+It is possible to express an alias using the attribute `arg_enum(alias = "AliasVariant")`.
 The `FromStr` will map the "AliasVariant" string to the decorated enum variant:
 
 ``` rust
