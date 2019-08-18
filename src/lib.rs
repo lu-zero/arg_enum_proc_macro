@@ -75,6 +75,7 @@ impl Parse for ArgEnumAttrs {
 /// #[derive(ArgEnum)]
 /// enum Foo {
 ///     A,
+///     #[arg_enum(alias = "Bar")]
 ///     B
 /// }
 /// ```
@@ -92,8 +93,9 @@ impl Parse for ArgEnumAttrs {
 ///         match s {
 ///             "A" | _ if s.eq_ignore_ascii_case("A") => Ok(Foo::A),
 ///             "B" | _ if s.eq_ignore_ascii_case("B") => Ok(Foo::B),
+///             "Bar" | _ if s.eq_ignore_ascii_case("Bar") => Ok(Foo::B),
 ///             _ => Err({
-///                 let v = vec![ "A", "B" ];
+///                 let v = vec![ "A", "B", "Bar" ];
 ///                 format!("valid values: {}", v.join(" ,"))
 ///             }),
 ///         }
@@ -110,8 +112,8 @@ impl Parse for ArgEnumAttrs {
 ///
 /// impl Foo {
 ///     #[allow(dead_code)]
-///     pub fn variants() -> [&'static str; 2] {
-///         [ "A", "B" ]
+///     pub fn variants() -> [&'static str; 3] {
+///         [ "A", "B", "Bar" ]
 ///     }
 /// }
 /// ```
