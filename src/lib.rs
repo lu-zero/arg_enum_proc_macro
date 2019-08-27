@@ -111,6 +111,7 @@ impl Parse for ArgEnumAttrs {
 /// }
 ///
 /// impl Foo {
+///     /// Returns an array of valid values which can be converted into this enum.
 ///     #[allow(dead_code)]
 ///     pub fn variants() -> [&'static str; 3] {
 ///         [ "A", "B", "Bar" ]
@@ -210,6 +211,7 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
             }
         }
         impl #name {
+            /// Returns an array of valid values which can be converted into this enum.
             pub fn variants() -> [&'static str; #len] {
                 [ #array_items ]
             }
