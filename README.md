@@ -9,7 +9,7 @@
 In `Cargo.toml`:
 ``` toml
 [dependencies]
-arg_enum_proc_macro = "0.1"
+arg_enum_proc_macro = "0.3"
 ```
 
 In the rust code:
