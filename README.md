@@ -1,5 +1,9 @@
 # Procedural macro derive that mimics `arg_enum!` from [clap](https://clap.rs)
 
+![Crates.io](https://img.shields.io/crates/v/arg_enum_proc_macro)
+![docs.rs](https://docs.rs/mio/badge.svg)
+[![dependency status](https://deps.rs/repo/github/lu-zero/arg_enum_proc_macro/status.svg)](https://deps.rs/repo/github/lu-zero/arg_enum_proc_macro)
+
 ## Usage
 
 In `Cargo.toml`:
