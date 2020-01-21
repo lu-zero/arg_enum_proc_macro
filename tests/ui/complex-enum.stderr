@@ -1,0 +1,8 @@
+error: proc-macro derive panicked
+  --> $DIR/complex-enum.rs:10:10
+   |
+10 | #[derive(ArgEnum)]
+   |          ^^^^^^^
+   |
+   = help: message: Only enum with unit variants are supported! 
+           Variant Complex::B is not an unit variant
