@@ -135,7 +135,13 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let id = &item.ident;
             let lit: TokenTree = Literal::string(&id.to_string()).into();
             let mut all_lits = vec![(lit, id)];
-
+            if ! item.fields.is_empty() {
+                panic!(
+                    "Only enum with unit variants are supported! \n\
+                    Variant {}::{} is not an unit variant",
+                    name, &id.to_string()
+                );
+            }
             item.attrs
                 .iter()
                 .filter(|attr| attr.path.is_ident("arg_enum"))
