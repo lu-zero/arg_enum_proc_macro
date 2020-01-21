@@ -7,15 +7,6 @@ pub enum Foo {
     Baz,
 }
 
-// should fail to compile
-/*
-#[derive(ArgEnum)]
-pub enum Complex {
-    A,
-    B(Foo),
-    C{a: usize, b: usize},
-}
-*/
 
 #[test]
 fn parse() {
@@ -50,5 +41,14 @@ mod alias {
     #[test]
     fn variants() {
         assert_eq!(&Bar::variants(), &["A", "B", "C", "Cat"]);
+    }
+}
+
+mod ui {
+    #[test]
+    fn invalid_applications() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/ui/complex-enum.rs");
+        t.compile_fail("tests/ui/derive-not-on-enum.rs");
     }
 }
