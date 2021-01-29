@@ -5,3 +5,5 @@ pub struct Complicated {
     pub foo: u8,
     pub bar: u8,
 }
+
+fn main() {}

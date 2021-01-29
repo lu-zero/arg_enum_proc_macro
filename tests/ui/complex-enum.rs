@@ -1,6 +1,5 @@
 use arg_enum_proc_macro::ArgEnum;
 
-
 pub enum Foo {
     Bar,
     /// Foo
@@ -11,5 +10,7 @@ pub enum Foo {
 pub enum Complex {
     A,
     B(Foo),
-    C{a: usize, b: usize},
+    C { a: usize, b: usize },
 }
+
+fn main() {}
