@@ -67,6 +67,44 @@ mod name {
     }
 }
 
+mod description {
+    use arg_enum_proc_macro::ArgEnum;
+
+    #[derive(ArgEnum, PartialEq, Debug)]
+    pub enum Bar {
+        /// This is A and it's description is a single line
+        A,
+        /// This is B and it's description contains " for no specific reason
+        /// and is in two lines.
+        B,
+        /// This is C, normally known as "Cat" or "Feline"
+        #[arg_enum(name = "Cat", alias = "Feline")]
+        C,
+    }
+
+    #[test]
+    fn descriptions() {
+        let expected: [(&'static [&'static str], &'static [&'static str]); 3usize] = [
+            (
+                &["A"],
+                &[" This is A and it's description is a single line"],
+            ),
+            (
+                &["B"],
+                &[
+                    " This is B and it's description contains \" for no specific reason",
+                    " and is in two lines.",
+                ],
+            ),
+            (
+                &["Cat", "Feline"],
+                &[" This is C, normally known as \"Cat\" or \"Feline\""],
+            ),
+        ];
+        assert_eq!(&Bar::descriptions(), &expected);
+    }
+}
+
 mod ui {
     #[test]
     fn invalid_applications() {

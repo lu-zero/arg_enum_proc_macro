@@ -20,7 +20,12 @@ use quote::{quote, quote_spanned};
 use std::iter::FromIterator;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::{parenthesized, parse2, parse_macro_input, Data, DeriveInput, Ident, LitStr, Token};
+use syn::Lit::Str;
+use syn::Meta::NameValue;
+use syn::{
+    parenthesized, parse2, parse_macro_input, Data, DeriveInput, Ident, LitStr, MetaNameValue,
+    Token,
+};
 
 #[derive(Debug)]
 enum ArgEnumAttr {
@@ -82,8 +87,11 @@ impl Parse for ArgEnumAttrs {
 /// #[derive(ArgEnum)]
 /// enum Foo {
 ///     A,
+///     /// Describe B
 ///     #[arg_enum(alias = "Bar")]
 ///     B,
+///     /// Describe C
+///     /// Multiline
 ///     #[arg_enum(name = "Baz")]
 ///     C,
 /// }
@@ -128,6 +136,12 @@ impl Parse for ArgEnumAttrs {
 ///     pub fn variants() -> [&'static str; 4] {
 ///         [ "A", "B", "Bar", "Baz", ]
 ///     }
+///     #[allow(dead_code)]
+///     pub fn descriptions() -> [(&'static [&'static str], &'static [&'static str]) ;3] {
+///         [(&["A"], &[]),
+///          (&["B", "Bar"], &[" Describe B"]),
+///          (&["Baz"], &[" Describe C", " Multiline"]),]
+///     }
 /// }
 /// ```
 #[proc_macro_derive(ArgEnum, attributes(arg_enum))]
@@ -145,8 +159,6 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
         .iter()
         .flat_map(|item| {
             let id = &item.ident;
-            let lit: TokenTree = Literal::string(&id.to_string()).into();
-            let mut all_lits = vec![(lit, id)];
             if !item.fields.is_empty() {
                 panic!(
                     "Only enum with unit variants are supported! \n\
@@ -155,6 +167,9 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     &id.to_string()
                 );
             }
+
+            let lit: TokenTree = Literal::string(&id.to_string()).into();
+            let mut all_lits = vec![(lit, id)];
             item.attrs
                 .iter()
                 .filter(|attr| attr.path.is_ident("arg_enum"))
@@ -186,6 +201,45 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let from_str_match = TokenStream::from_iter(from_str_match);
 
+    let all_descriptions: Vec<(Vec<TokenTree>, Vec<LitStr>)> = variants
+        .iter()
+        .map(|item| {
+            let id = &item.ident;
+            let description = item
+                .attrs
+                .iter()
+                .filter(|attr| attr.path.is_ident("doc"))
+                .filter_map(|attr| {
+                    if let Ok(NameValue(MetaNameValue { lit: Str(s), .. })) = attr.parse_meta() {
+                        Some(s)
+                    } else {
+                        // non #[doc = "..."] attributes are not our concern
+                        // we leave them for rustc to handle
+                        None
+                    }
+                })
+                .collect();
+            let lit: TokenTree = Literal::string(&id.to_string()).into();
+            let mut all_names = vec![lit];
+            item.attrs
+                .iter()
+                .filter(|attr| attr.path.is_ident("arg_enum"))
+                // .flat_map(|attr| {
+                .for_each(|attr| {
+                    let attrs: ArgEnumAttrs = parse2(attr.tokens.clone()).unwrap();
+
+                    for attr in attrs.attrs {
+                        match attr {
+                            ArgEnumAttr::Alias(alias) => all_names.push(alias.into()),
+                            ArgEnumAttr::Name(name) => all_names[0] = name.into(),
+                        }
+                    }
+                });
+
+            (all_names, description)
+        })
+        .collect();
+
     let display_match = variants.iter().flat_map(|item| {
         let id = &item.ident;
         let lit: TokenTree = Literal::string(&id.to_string()).into();
@@ -206,6 +260,15 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
         .flat_map(|(tok, _id)| vec![tok.clone(), comma.clone()].into_iter());
 
     let array_items = TokenStream::from_iter(array_items);
+
+    let array_descriptions = all_descriptions.iter().map(|(names, descr)| {
+        quote! {
+            (&[ #(#names),* ], &[ #(#descr),* ]),
+        }
+    });
+    let array_descriptions = TokenStream::from_iter(array_descriptions);
+
+    let len_descriptions = all_descriptions.len();
 
     let ret: TokenStream = quote_spanned! {
         Span::call_site() =>
@@ -231,9 +294,15 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
             }
         }
         impl #name {
+            #[allow(dead_code)]
             /// Returns an array of valid values which can be converted into this enum.
             pub fn variants() -> [&'static str; #len] {
                 [ #array_items ]
+            }
+            #[allow(dead_code)]
+            /// Returns an array of touples (variants, description)
+            pub fn descriptions() -> [(&'static [&'static str], &'static [&'static str]); #len_descriptions] {
+                [ #array_descriptions ]
             }
         }
     }
