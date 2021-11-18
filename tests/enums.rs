@@ -7,7 +7,6 @@ pub enum Foo {
     Baz,
 }
 
-
 #[test]
 fn parse() {
     let v: Foo = "Baz".parse().unwrap();
@@ -41,6 +40,30 @@ mod alias {
     #[test]
     fn variants() {
         assert_eq!(&Bar::variants(), &["A", "B", "C", "Cat"]);
+    }
+}
+
+mod name {
+    use arg_enum_proc_macro::ArgEnum;
+
+    #[derive(ArgEnum, PartialEq, Debug)]
+    pub enum Bar {
+        A,
+        B,
+        #[arg_enum(name = "Cat", alias = "Feline")]
+        C,
+    }
+
+    #[test]
+    fn parse() {
+        let v: Bar = "Cat".parse().unwrap();
+
+        assert_eq!(v, Bar::C);
+    }
+
+    #[test]
+    fn variants() {
+        assert_eq!(&Bar::variants(), &["A", "B", "Cat", "Feline"]);
     }
 }
 

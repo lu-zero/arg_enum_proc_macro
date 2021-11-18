@@ -24,7 +24,10 @@ use syn::{parenthesized, parse2, parse_macro_input, Data, DeriveInput, Ident, Li
 
 #[derive(Debug)]
 enum ArgEnumAttr {
+    /// An alias for the Enum
     Alias(Literal),
+    /// Override the default string representation for the variant
+    Name(Literal),
 }
 
 impl Parse for ArgEnumAttr {
@@ -40,6 +43,10 @@ impl Parse for ArgEnumAttr {
                 "alias" => {
                     let alias: LitStr = input.parse()?;
                     Ok(Alias(Literal::string(&alias.value())))
+                }
+                "name" => {
+                    let name: LitStr = input.parse()?;
+                    Ok(Name(Literal::string(&name.value())))
                 }
                 _ => panic!("unexpected attribute {}", name_str),
             }
@@ -76,7 +83,9 @@ impl Parse for ArgEnumAttrs {
 /// enum Foo {
 ///     A,
 ///     #[arg_enum(alias = "Bar")]
-///     B
+///     B,
+///     #[arg_enum(name = "Baz")]
+///     C,
 /// }
 /// ```
 ///
@@ -84,7 +93,8 @@ impl Parse for ArgEnumAttrs {
 /// ``` no_run
 /// enum Foo {
 ///     A,
-///     B
+///     B,
+///     C
 /// }
 /// impl ::std::str::FromStr for Foo {
 ///     type Err = String;
@@ -94,8 +104,9 @@ impl Parse for ArgEnumAttrs {
 ///             "A" | _ if s.eq_ignore_ascii_case("A") => Ok(Foo::A),
 ///             "B" | _ if s.eq_ignore_ascii_case("B") => Ok(Foo::B),
 ///             "Bar" | _ if s.eq_ignore_ascii_case("Bar") => Ok(Foo::B),
+///             "Baz" | _ if s.eq_ignore_ascii_case("Baz") => Ok(Foo::C),
 ///             _ => Err({
-///                 let v = vec![ "A", "B", "Bar" ];
+///                 let v = vec![ "A", "B", "Bar", "Baz" ];
 ///                 format!("valid values: {}", v.join(" ,"))
 ///             }),
 ///         }
@@ -106,6 +117,7 @@ impl Parse for ArgEnumAttrs {
 ///         match *self {
 ///             Foo::A => write!(f, "A"),
 ///             Foo::B => write!(f, "B"),
+///             Foo::C => write!(f, "C"),
 ///         }
 ///     }
 /// }
@@ -113,8 +125,8 @@ impl Parse for ArgEnumAttrs {
 /// impl Foo {
 ///     /// Returns an array of valid values which can be converted into this enum.
 ///     #[allow(dead_code)]
-///     pub fn variants() -> [&'static str; 3] {
-///         [ "A", "B", "Bar" ]
+///     pub fn variants() -> [&'static str; 4] {
+///         [ "A", "B", "Bar", "Baz", ]
 ///     }
 /// }
 /// ```
@@ -135,11 +147,12 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let id = &item.ident;
             let lit: TokenTree = Literal::string(&id.to_string()).into();
             let mut all_lits = vec![(lit, id)];
-            if ! item.fields.is_empty() {
+            if !item.fields.is_empty() {
                 panic!(
                     "Only enum with unit variants are supported! \n\
                     Variant {}::{} is not an unit variant",
-                    name, &id.to_string()
+                    name,
+                    &id.to_string()
                 );
             }
             item.attrs
@@ -152,6 +165,7 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     for attr in attrs.attrs {
                         match attr {
                             ArgEnumAttr::Alias(alias) => all_lits.push((alias.into(), id)),
+                            ArgEnumAttr::Name(name) => all_lits[0] = (name.into(), id),
                         }
                     }
                 });
