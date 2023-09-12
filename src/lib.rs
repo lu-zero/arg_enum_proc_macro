@@ -18,65 +18,10 @@ extern crate proc_macro;
 use proc_macro2::{Literal, Punct, Span, TokenStream, TokenTree};
 use quote::{quote, quote_spanned};
 use std::iter::FromIterator;
-use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
-use syn::Lit::Str;
-use syn::Meta::NameValue;
-use syn::{
-    parenthesized, parse2, parse_macro_input, Data, DeriveInput, Ident, LitStr, MetaNameValue,
-    Token,
-};
 
-#[derive(Debug)]
-enum ArgEnumAttr {
-    /// An alias for the Enum
-    Alias(Literal),
-    /// Override the default string representation for the variant
-    Name(Literal),
-}
-
-impl Parse for ArgEnumAttr {
-    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
-        use self::ArgEnumAttr::*;
-        let name: Ident = input.parse()?;
-        let name_str = name.to_string();
-
-        if input.peek(Token![=]) {
-            input.parse::<Token![=]>()?;
-
-            match name_str.as_ref() {
-                "alias" => {
-                    let alias: LitStr = input.parse()?;
-                    Ok(Alias(Literal::string(&alias.value())))
-                }
-                "name" => {
-                    let name: LitStr = input.parse()?;
-                    Ok(Name(Literal::string(&name.value())))
-                }
-                _ => panic!("unexpected attribute {}", name_str),
-            }
-        } else {
-            panic!("unexpected attribute: {}", name_str)
-        }
-    }
-}
-
-#[derive(Debug)]
-struct ArgEnumAttrs {
-    _paren_token: syn::token::Paren,
-    attrs: Punctuated<ArgEnumAttr, Token![,]>,
-}
-
-impl Parse for ArgEnumAttrs {
-    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
-        let content;
-
-        Ok(ArgEnumAttrs {
-            _paren_token: parenthesized!(content in input),
-            attrs: content.parse_terminated(ArgEnumAttr::parse)?,
-        })
-    }
-}
+use syn::Lit::{self};
+use syn::Meta::{self};
+use syn::{parse_macro_input, Data, DeriveInput, Expr, ExprLit, Ident, LitStr};
 
 /// Implement [`std::fmt::Display`], [`std::str::FromStr`] and `variants()`.
 ///
@@ -172,17 +117,23 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let mut all_lits = vec![(lit, id)];
             item.attrs
                 .iter()
-                .filter(|attr| attr.path.is_ident("arg_enum"))
+                .filter(|attr| attr.path().is_ident("arg_enum"))
                 // .flat_map(|attr| {
                 .for_each(|attr| {
-                    let attrs: ArgEnumAttrs = parse2(attr.tokens.clone()).unwrap();
-
-                    for attr in attrs.attrs {
-                        match attr {
-                            ArgEnumAttr::Alias(alias) => all_lits.push((alias.into(), id)),
-                            ArgEnumAttr::Name(name) => all_lits[0] = (name.into(), id),
+                    attr.parse_nested_meta(|meta| {
+                        if meta.path.is_ident("alias") {
+                            let val = meta.value()?;
+                            let alias: Literal = val.parse()?;
+                            all_lits.push((alias.into(), id));
                         }
-                    }
+                        if meta.path.is_ident("name") {
+                            let val = meta.value()?;
+                            let name: Literal = val.parse()?;
+                            all_lits[0] = (name.into(), id);
+                        }
+                        Ok(())
+                    })
+                    .unwrap();
                 });
             all_lits.into_iter()
         })
@@ -207,32 +158,52 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let description = item
                 .attrs
                 .iter()
-                .filter(|attr| attr.path.is_ident("doc"))
                 .filter_map(|attr| {
-                    if let Ok(NameValue(MetaNameValue { lit: Str(s), .. })) = attr.parse_meta() {
-                        Some(s)
-                    } else {
+                    let expr = match &attr.meta {
+                        Meta::NameValue(name_value) if name_value.path.is_ident("doc") => {
+                            Some(name_value.value.to_owned())
+                        }
+                        _ =>
                         // non #[doc = "..."] attributes are not our concern
                         // we leave them for rustc to handle
-                        None
-                    }
+                        {
+                            None
+                        }
+                    };
+
+                    expr.and_then(|expr| {
+                        if let Expr::Lit(ExprLit {
+                            lit: Lit::Str(s), ..
+                        }) = expr
+                        {
+                            Some(s)
+                        } else {
+                            None
+                        }
+                    })
                 })
                 .collect();
             let lit: TokenTree = Literal::string(&id.to_string()).into();
             let mut all_names = vec![lit];
             item.attrs
                 .iter()
-                .filter(|attr| attr.path.is_ident("arg_enum"))
+                .filter(|attr| attr.path().is_ident("arg_enum"))
                 // .flat_map(|attr| {
                 .for_each(|attr| {
-                    let attrs: ArgEnumAttrs = parse2(attr.tokens.clone()).unwrap();
-
-                    for attr in attrs.attrs {
-                        match attr {
-                            ArgEnumAttr::Alias(alias) => all_names.push(alias.into()),
-                            ArgEnumAttr::Name(name) => all_names[0] = name.into(),
+                    attr.parse_nested_meta(|meta| {
+                        if meta.path.is_ident("alias") {
+                            let val = meta.value()?;
+                            let alias: Literal = val.parse()?;
+                            all_names.push(alias.into());
                         }
-                    }
+                        if meta.path.is_ident("name") {
+                            let val = meta.value()?;
+                            let name: Literal = val.parse()?;
+                            all_names[0] = name.into();
+                        }
+                        Ok(())
+                    })
+                    .unwrap();
                 });
 
             (all_names, description)
