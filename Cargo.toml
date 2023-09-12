@@ -1,6 +1,6 @@
 [package]
 name = "arg_enum_proc_macro"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Luca Barbato <lu_zero@gentoo.org>"]
 description = "A procedural macro compatible with clap arg_enum"
 repository = "https://github.com/lu-zero/arg_enum_proc_macro"
