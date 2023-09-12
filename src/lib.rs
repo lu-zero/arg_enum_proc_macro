@@ -63,7 +63,7 @@ impl Parse for ArgEnumAttr {
 
 #[derive(Debug)]
 struct ArgEnumAttrs {
-    paren_token: syn::token::Paren,
+    _paren_token: syn::token::Paren,
     attrs: Punctuated<ArgEnumAttr, Token![,]>,
 }
 
@@ -72,7 +72,7 @@ impl Parse for ArgEnumAttrs {
         let content;
 
         Ok(ArgEnumAttrs {
-            paren_token: parenthesized!(content in input),
+            _paren_token: parenthesized!(content in input),
             attrs: content.parse_terminated(ArgEnumAttr::parse)?,
         })
     }
@@ -193,8 +193,7 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let from_str_match = all_variants.iter().flat_map(|(lit, id)| {
         let pat: TokenStream = quote! {
             #lit | _ if s.eq_ignore_ascii_case(#lit) => Ok(#name::#id),
-        }
-        .into();
+        };
 
         pat.into_iter()
     });
@@ -246,8 +245,7 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         let pat: TokenStream = quote! {
             #name::#id => write!(f, #lit),
-        }
-        .into();
+        };
 
         pat.into_iter()
     });
@@ -279,7 +277,7 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 match s {
                     #from_str_match
                     _ => {
-                        let values = vec![ #array_items ];
+                        let values = [ #array_items ];
 
                         Err(format!("valid values: {}", values.join(" ,")))
                     }
@@ -305,8 +303,7 @@ pub fn arg_enum(items: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 [ #array_descriptions ]
             }
         }
-    }
-    .into();
+    };
 
     ret.into()
 }
